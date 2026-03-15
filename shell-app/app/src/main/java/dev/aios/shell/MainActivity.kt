@@ -10,15 +10,13 @@ import androidx.activity.enableEdgeToEdge
 import dev.aios.shell.ui.AIOSApp
 import dev.aios.shell.ui.theme.AIOSTheme
 
-/// MainActivity is like your @main App struct in SwiftUI.
-/// It's the entry point — sets up the Compose UI tree.
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             AIOSTheme {
-                AIOSApp()
+                AIOSApp(context = applicationContext)
             }
         }
     }

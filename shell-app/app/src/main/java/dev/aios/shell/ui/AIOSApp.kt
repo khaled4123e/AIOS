@@ -3,6 +3,7 @@
 
 package dev.aios.shell.ui
 
+import android.content.Context
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -16,6 +17,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,7 +31,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -37,7 +39,7 @@ import dev.aios.shell.viewmodel.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-// ─── Colors ─────────────────────────────────────────
+// Colors
 private val BgDark = Color(0xFF0A0E1A)
 private val BgGradientTop = Color(0xFF0F1629)
 private val BgGradientBottom = Color(0xFF060A14)
@@ -46,44 +48,73 @@ private val AvatarGreen = Color(0xFF10B981)
 private val AvatarAmber = Color(0xFFF59E0B)
 private val AvatarRed = Color(0xFFEF4444)
 private val AvatarPurple = Color(0xFF8B5CF6)
+private val AvatarCyan = Color(0xFF06B6D4)
 private val CardBg = Color(0xFF1E293B)
 private val CardBgLight = Color(0xFF334155)
 private val TextPrimary = Color(0xFFF1F5F9)
 private val TextSecondary = Color(0xFF94A3B8)
 private val TextMuted = Color(0xFF64748B)
 
+private enum class Screen {
+    LAUNCHER,
+    SETTINGS,
+}
+
 @Composable
-fun AIOSApp(viewModel: ShellViewModel = viewModel()) {
+fun AIOSApp(
+    context: Context,
+    viewModel: ShellViewModel = viewModel(factory = ShellViewModel.Factory(context)),
+) {
     val uiState by viewModel.uiState.collectAsState()
+    var currentScreen by remember { mutableStateOf(Screen.LAUNCHER) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(BgGradientTop, BgGradientBottom)))
-    ) {
-        // Main launcher screen
-        LauncherScreen(
-            uiState = uiState,
-            onAvatarTap = { viewModel.onAvatarTapped() },
-        )
+    when (currentScreen) {
+        Screen.LAUNCHER -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Brush.verticalGradient(listOf(BgGradientTop, BgGradientBottom)))
+            ) {
+                LauncherScreen(
+                    uiState = uiState,
+                    onAvatarTap = { viewModel.onAvatarTapped() },
+                    onSettingsTap = { currentScreen = Screen.SETTINGS },
+                )
 
-        // Chat overlay (slides up when avatar is tapped)
-        if (uiState.isChatOpen) {
-            ChatOverlay(
-                uiState = uiState,
-                onSend = { viewModel.onUserInput(it) },
-                onDismiss = { viewModel.onChatDismiss() },
-                onApprove = { viewModel.onApprove() },
-                onDeny = { viewModel.onDeny() },
-                onTyping = { viewModel.onUserTyping() },
+                if (uiState.isChatOpen) {
+                    ChatOverlay(
+                        uiState = uiState,
+                        onSend = { viewModel.onUserInput(it) },
+                        onDismiss = { viewModel.onChatDismiss() },
+                        onApprove = { viewModel.onApprove() },
+                        onDeny = { viewModel.onDeny() },
+                        onTyping = { viewModel.onUserTyping() },
+                    )
+                }
+            }
+        }
+        Screen.SETTINGS -> {
+            SettingsScreen(
+                onBackendChanged = { type ->
+                    viewModel.setPreferredBackend(type)
+                },
+                onApiConfigured = { type, key, model, url ->
+                    viewModel.configureExternalAPI(type, key, model, url)
+                },
+                onLocalModelSelected = { modelName ->
+                    viewModel.configureLocalModel(modelName)
+                },
+                onSettingChanged = { key, value ->
+                    viewModel.updateSetting(key, value)
+                },
+                onBack = { currentScreen = Screen.LAUNCHER },
             )
         }
     }
 }
 
-// ─── Launcher Home Screen ───────────────────────────
 @Composable
-fun LauncherScreen(uiState: ShellUiState, onAvatarTap: () -> Unit) {
+fun LauncherScreen(uiState: ShellUiState, onAvatarTap: () -> Unit, onSettingsTap: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -91,28 +122,34 @@ fun LauncherScreen(uiState: ShellUiState, onAvatarTap: () -> Unit) {
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(40.dp))
-
-        // Clock & Date
+        // Settings button at top-right
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            IconButton(onClick = onSettingsTap) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Einstellungen",
+                    tint = TextMuted,
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
         ClockWidget()
-
         Spacer(Modifier.height(48.dp))
-
-        // Avatar
         AIOSAvatar(
             mood = uiState.avatarMood,
             statusText = uiState.statusText,
             onTap = onAvatarTap,
         )
-
         Spacer(Modifier.height(32.dp))
-
-        // Status cards
-        StatusCards()
-
+        StatusCards(
+            toolCount = uiState.toolCount,
+            auditCount = uiState.auditCount,
+            aiAvailable = uiState.aiAvailable,
+        )
         Spacer(Modifier.weight(1f))
-
-        // Hint at bottom
         Text(
             text = "Tippe den Avatar an um zu sprechen",
             color = TextMuted,
@@ -122,13 +159,11 @@ fun LauncherScreen(uiState: ShellUiState, onAvatarTap: () -> Unit) {
     }
 }
 
-// ─── Clock Widget ───────────────────────────────────
 @Composable
 fun ClockWidget() {
     val currentTime = remember { mutableStateOf(getCurrentTime()) }
     val currentDate = remember { mutableStateOf(getCurrentDate()) }
 
-    // Update every second
     LaunchedEffect(Unit) {
         while (true) {
             currentTime.value = getCurrentTime()
@@ -163,12 +198,10 @@ private fun getCurrentDate(): String {
     return SimpleDateFormat("EEEE, d. MMMM", Locale.GERMAN).format(Date())
 }
 
-// ─── Avatar ─────────────────────────────────────────
 @Composable
 fun AIOSAvatar(mood: AvatarMood, statusText: String, onTap: () -> Unit) {
     val infiniteTransition = rememberInfiniteTransition(label = "avatar")
 
-    // Breathing / pulsing animation
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = when (mood) {
@@ -193,12 +226,11 @@ fun AIOSAvatar(mood: AvatarMood, statusText: String, onTap: () -> Unit) {
         label = "pulse",
     )
 
-    // Glow color based on mood
     val glowColor by animateColorAsState(
         targetValue = when (mood) {
             AvatarMood.IDLE -> AvatarBlue.copy(alpha = 0.3f)
             AvatarMood.LISTENING -> AvatarPurple.copy(alpha = 0.4f)
-            AvatarMood.THINKING -> AvatarBlue.copy(alpha = 0.5f)
+            AvatarMood.THINKING -> AvatarCyan.copy(alpha = 0.5f)
             AvatarMood.EXECUTING -> AvatarBlue.copy(alpha = 0.6f)
             AvatarMood.SUCCESS -> AvatarGreen.copy(alpha = 0.5f)
             AvatarMood.BLOCKED -> AvatarRed.copy(alpha = 0.4f)
@@ -212,7 +244,7 @@ fun AIOSAvatar(mood: AvatarMood, statusText: String, onTap: () -> Unit) {
         targetValue = when (mood) {
             AvatarMood.IDLE -> AvatarBlue
             AvatarMood.LISTENING -> AvatarPurple
-            AvatarMood.THINKING -> AvatarBlue
+            AvatarMood.THINKING -> AvatarCyan
             AvatarMood.EXECUTING -> AvatarBlue
             AvatarMood.SUCCESS -> AvatarGreen
             AvatarMood.BLOCKED -> AvatarRed
@@ -223,7 +255,6 @@ fun AIOSAvatar(mood: AvatarMood, statusText: String, onTap: () -> Unit) {
     )
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // Avatar orb
         Box(
             modifier = Modifier
                 .size(140.dp)
@@ -235,7 +266,7 @@ fun AIOSAvatar(mood: AvatarMood, statusText: String, onTap: () -> Unit) {
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            // Outer glow ring
+            // Outer glow
             Box(
                 modifier = Modifier
                     .size(140.dp)
@@ -279,14 +310,12 @@ fun AIOSAvatar(mood: AvatarMood, statusText: String, onTap: () -> Unit) {
 
         Spacer(Modifier.height(16.dp))
 
-        // Status text
         Text(
             text = statusText,
             color = TextSecondary,
             fontSize = 14.sp,
         )
 
-        // Mood label
         Text(
             text = when (mood) {
                 AvatarMood.IDLE -> "AIOS"
@@ -303,9 +332,8 @@ fun AIOSAvatar(mood: AvatarMood, statusText: String, onTap: () -> Unit) {
     }
 }
 
-// ─── Status Cards ───────────────────────────────────
 @Composable
-fun StatusCards() {
+fun StatusCards(toolCount: Int, auditCount: Int, aiAvailable: Boolean = false) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -313,20 +341,20 @@ fun StatusCards() {
         StatusCard(
             title = "System",
             value = "Aktiv",
-            detail = "5 Tools bereit",
+            detail = "$toolCount Tools bereit",
             color = AvatarGreen,
             modifier = Modifier.weight(1f),
         )
         StatusCard(
-            title = "Policy",
-            value = "Sicher",
-            detail = "deny-by-default",
-            color = AvatarBlue,
+            title = "KI",
+            value = if (aiAvailable) "Online" else "Offline",
+            detail = if (aiAvailable) "LLM aktiv" else "Keyword-Modus",
+            color = if (aiAvailable) AvatarCyan else AvatarAmber,
             modifier = Modifier.weight(1f),
         )
         StatusCard(
             title = "Audit",
-            value = "0",
+            value = "$auditCount",
             detail = "Aktionen",
             color = AvatarPurple,
             modifier = Modifier.weight(1f),
@@ -347,9 +375,7 @@ fun StatusCard(
         shape = RoundedCornerShape(16.dp),
         color = CardBg,
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-        ) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Text(text = title, color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(4.dp))
             Text(text = value, color = color, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -358,7 +384,6 @@ fun StatusCard(
     }
 }
 
-// ─── Chat Overlay ───────────────────────────────────
 @Composable
 fun ChatOverlay(
     uiState: ShellUiState,
@@ -381,12 +406,12 @@ fun ChatOverlay(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.65f)
+                .fillMaxHeight(0.7f)
                 .align(Alignment.BottomCenter)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                    onClick = { /* prevent dismiss */ },
+                    onClick = { },
                 ),
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             color = BgDark,
@@ -426,7 +451,6 @@ fun ChatOverlay(
                     }
                 }
 
-                // Approval banner
                 if (uiState.pendingAction != null) {
                     ApprovalBanner(
                         consentRequired = uiState.pendingAction?.consentRequired,
@@ -435,7 +459,6 @@ fun ChatOverlay(
                     )
                 }
 
-                // Input
                 ChatInput(
                     isProcessing = uiState.isProcessing,
                     onSend = onSend,
@@ -452,6 +475,8 @@ fun ChatBubble(message: ChatMessage) {
     val bubbleColor = when {
         isUser -> AvatarBlue
         message.type == MessageType.PLAN -> CardBg
+        message.type == MessageType.MULTI_STEP -> Color(0xFF1E3A5F)
+        message.type == MessageType.AI_THINKING -> Color(0xFF164E63)
         message.type == MessageType.POLICY_RESULT -> when (message.decision) {
             Decision.ALLOW, Decision.ALLOW_WITH_LOG -> Color(0xFF064E3B)
             Decision.REQUIRE_CONFIRMATION -> Color(0xFF78350F)
@@ -479,22 +504,20 @@ fun ChatBubble(message: ChatMessage) {
                 .background(bubbleColor)
                 .padding(12.dp),
         ) {
-            if (message.type == MessageType.PLAN || message.type == MessageType.POLICY_RESULT) {
-                Text(
-                    text = message.text,
-                    color = TextSecondary,
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    lineHeight = 17.sp,
-                )
-            } else {
-                Text(
-                    text = message.text,
-                    color = if (isUser) Color.White else TextPrimary,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                )
-            }
+            val useMonospace = message.type == MessageType.PLAN ||
+                message.type == MessageType.POLICY_RESULT ||
+                message.type == MessageType.MULTI_STEP ||
+                message.type == MessageType.AI_THINKING
+
+            Text(
+                text = message.text,
+                color = if (isUser) Color.White
+                    else if (useMonospace) TextSecondary
+                    else TextPrimary,
+                fontSize = if (useMonospace) 12.sp else 14.sp,
+                fontFamily = if (useMonospace) FontFamily.Monospace else FontFamily.Default,
+                lineHeight = if (useMonospace) 17.sp else 20.sp,
+            )
         }
     }
 }
