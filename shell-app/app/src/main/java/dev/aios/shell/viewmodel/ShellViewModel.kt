@@ -12,10 +12,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-/// ShellViewModel — like an ObservableObject in SwiftUI.
-/// Manages the conversation state and orchestrates the full pipeline:
-/// Input → Intent Parse → Plan → Policy → Execute → Audit
-
 data class ChatMessage(
     val text: String,
     val isUser: Boolean,
@@ -25,11 +21,11 @@ data class ChatMessage(
 )
 
 enum class MessageType {
-    TEXT,           // Normal message
-    PLAN,           // Shows the execution plan
-    POLICY_RESULT,  // Shows policy decision
-    TOOL_RESULT,    // Shows tool execution result
-    ERROR,          // Error message
+    TEXT,
+    PLAN,
+    POLICY_RESULT,
+    TOOL_RESULT,
+    ERROR,
 }
 
 data class PendingAction(
@@ -38,10 +34,23 @@ data class PendingAction(
     val consentRequired: String?,
 )
 
+enum class AvatarMood {
+    IDLE,
+    LISTENING,
+    THINKING,
+    EXECUTING,
+    SUCCESS,
+    BLOCKED,
+    ALERT,
+}
+
 data class ShellUiState(
     val messages: List<ChatMessage> = emptyList(),
     val isProcessing: Boolean = false,
     val pendingAction: PendingAction? = null,
+    val avatarMood: AvatarMood = AvatarMood.IDLE,
+    val statusText: String = "Bereit",
+    val isChatOpen: Boolean = false,
 )
 
 class ShellViewModel : ViewModel() {
@@ -53,66 +62,79 @@ class ShellViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(ShellUiState(
         messages = listOf(
             ChatMessage(
-                text = "Hallo! Ich bin AIOS, dein KI-Assistent. " +
-                    "Ich kann Systemeinstellungen ändern, Termine verwalten und mehr. " +
-                    "Was kann ich für dich tun?",
+                text = "Hallo! Tippe mich an oder schreib mir, was ich tun soll.",
                 isUser = false,
             )
         )
     ))
     val uiState: StateFlow<ShellUiState> = _uiState.asStateFlow()
 
-    /// User sends a message — the main entry point.
+    fun onAvatarTapped() {
+        _uiState.update { it.copy(isChatOpen = !it.isChatOpen) }
+    }
+
+    fun onChatDismiss() {
+        _uiState.update { it.copy(isChatOpen = false) }
+    }
+
+    fun onUserTyping() {
+        _uiState.update { it.copy(avatarMood = AvatarMood.LISTENING) }
+    }
+
     fun onUserInput(text: String) {
         if (text.isBlank()) return
 
-        // Add user message
         addMessage(ChatMessage(text = text, isUser = true))
-        _uiState.update { it.copy(isProcessing = true) }
+        _uiState.update {
+            it.copy(
+                isProcessing = true,
+                avatarMood = AvatarMood.THINKING,
+                statusText = "Verstehe...",
+            )
+        }
 
-        // 1. Parse intent
         val intent = intentParser.parse(text)
 
         if (intent == null) {
+            _uiState.update {
+                it.copy(
+                    avatarMood = AvatarMood.IDLE,
+                    statusText = "Bereit",
+                    isProcessing = false,
+                )
+            }
             addMessage(ChatMessage(
-                text = "Ich habe leider nicht verstanden, was du möchtest. " +
-                    "Versuche z.B.:\n" +
-                    "• \"Stelle auf Nicht stören\"\n" +
-                    "• \"Helligkeit auf 70%\"\n" +
-                    "• \"Erstelle einen Termin Meeting\"\n" +
-                    "• \"Schick Max eine Nachricht\"",
+                text = "Das habe ich nicht verstanden. Versuch z.B.:\n" +
+                    "- Stelle auf Nicht storen\n" +
+                    "- Helligkeit auf 70%\n" +
+                    "- Erstelle einen Termin\n" +
+                    "- Schick Max eine Nachricht",
                 isUser = false,
                 type = MessageType.ERROR,
             ))
-            _uiState.update { it.copy(isProcessing = false) }
             return
         }
 
-        // 2. Show the plan
         addMessage(ChatMessage(
-            text = "📋 Plan: ${intent.explanation}\n" +
-                "Tool: ${intent.toolId}\n" +
-                "Konfidenz: ${(intent.confidence * 100).toInt()}%",
+            text = "Plan: ${intent.explanation}\nTool: ${intent.toolId}\nKonfidenz: ${(intent.confidence * 100).toInt()}%",
             isUser = false,
             toolId = intent.toolId,
             type = MessageType.PLAN,
         ))
 
-        // 3. Check policy
+        _uiState.update { it.copy(statusText = intent.explanation) }
+
+        val tool = toolBroker.availableTools().find { it.id == intent.toolId }
         val context = dev.aios.shell.policy.PolicyContext(
             toolId = intent.toolId,
-            riskClass = toolBroker.availableTools()
-                .find { it.id == intent.toolId }?.riskClass ?: RiskClass.LOW,
-            capabilities = toolBroker.availableTools()
-                .find { it.id == intent.toolId }?.capabilities ?: emptyList(),
-            sideEffects = toolBroker.availableTools()
-                .find { it.id == intent.toolId }?.sideEffects ?: emptyList(),
+            riskClass = tool?.riskClass ?: RiskClass.LOW,
+            capabilities = tool?.capabilities ?: emptyList(),
+            sideEffects = tool?.sideEffects ?: emptyList(),
         )
         val policyResult = policyEngine.evaluate(context)
 
         addMessage(ChatMessage(
-            text = "🛡️ Policy: ${policyResult.decision.name}\n${policyResult.reason}" +
-                (policyResult.matchedRule?.let { "\nRegel: $it" } ?: ""),
+            text = "Policy: ${policyResult.decision.name}\n${policyResult.reason}",
             isUser = false,
             decision = policyResult.decision,
             type = MessageType.POLICY_RESULT,
@@ -120,17 +142,25 @@ class ShellViewModel : ViewModel() {
 
         when (policyResult.decision) {
             Decision.DENY, Decision.QUARANTINE -> {
+                _uiState.update {
+                    it.copy(
+                        isProcessing = false,
+                        avatarMood = AvatarMood.BLOCKED,
+                        statusText = "Blockiert",
+                    )
+                }
                 addMessage(ChatMessage(
-                    text = "❌ Aktion wurde von der Policy Engine blockiert.",
+                    text = "Aktion blockiert von Policy Engine.",
                     isUser = false,
                     type = MessageType.ERROR,
                 ))
-                _uiState.update { it.copy(isProcessing = false) }
             }
             Decision.REQUIRE_CONFIRMATION -> {
                 _uiState.update {
                     it.copy(
                         isProcessing = false,
+                        avatarMood = AvatarMood.ALERT,
+                        statusText = "Bestaetigung noetig",
                         pendingAction = PendingAction(
                             intent = intent,
                             policyDecision = policyResult.decision,
@@ -145,38 +175,54 @@ class ShellViewModel : ViewModel() {
         }
     }
 
-    /// User approves a pending action.
     fun onApprove() {
         val pending = _uiState.value.pendingAction ?: return
-        _uiState.update { it.copy(pendingAction = null, isProcessing = true) }
-        addMessage(ChatMessage(text = "✅ Freigabe erteilt", isUser = true))
+        _uiState.update {
+            it.copy(
+                pendingAction = null,
+                isProcessing = true,
+                avatarMood = AvatarMood.EXECUTING,
+                statusText = "Fuehre aus...",
+            )
+        }
+        addMessage(ChatMessage(text = "Freigabe erteilt", isUser = true))
         executeAction(pending.intent)
     }
 
-    /// User denies a pending action.
     fun onDeny() {
-        _uiState.update { it.copy(pendingAction = null) }
-        addMessage(ChatMessage(
-            text = "Aktion abgebrochen.",
-            isUser = false,
-        ))
+        _uiState.update {
+            it.copy(
+                pendingAction = null,
+                avatarMood = AvatarMood.IDLE,
+                statusText = "Bereit",
+            )
+        }
+        addMessage(ChatMessage(text = "Aktion abgebrochen.", isUser = false))
     }
 
     private fun executeAction(intent: ParsedIntent) {
-        // 4. Execute via Tool Broker
+        _uiState.update {
+            it.copy(avatarMood = AvatarMood.EXECUTING, statusText = "Fuehre aus...")
+        }
+
         val call = ToolCall(toolId = intent.toolId, input = intent.parameters)
         val result = toolBroker.execute(call)
 
-        // 5. Show result
-        val message = result.output["message"] as? String ?: "Ausgeführt"
+        val message = result.output["message"] as? String ?: "Ausgefuehrt"
         addMessage(ChatMessage(
-            text = "✅ $message\n⏱️ ${result.durationMs}ms | 📝 Audit: ${result.callId.take(8)}…",
+            text = "${message}\nDauer: ${result.durationMs}ms | Audit: ${result.callId.take(8)}",
             isUser = false,
             toolId = result.toolId,
             type = MessageType.TOOL_RESULT,
         ))
 
-        _uiState.update { it.copy(isProcessing = false) }
+        _uiState.update {
+            it.copy(
+                isProcessing = false,
+                avatarMood = AvatarMood.SUCCESS,
+                statusText = message,
+            )
+        }
     }
 
     private fun addMessage(message: ChatMessage) {
