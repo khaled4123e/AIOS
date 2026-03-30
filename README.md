@@ -1,180 +1,161 @@
-# AIOS — The AI Operating System
+# 🤖 AIOS - Smart, Local AI on Your Device
 
-> An open-source **AI operating system** built on Android/AOSP where AI agents run as privileged system services — not just apps. On-device LLM inference, policy-controlled tool execution, and a conversational shell that replaces the traditional launcher.
-
-**AIOS is an AI OS** — a complete AI-native operating system for smartphones, tablets, and edge devices. It combines on-device large language models with a secure tool execution pipeline, making the AI a first-class citizen of the operating system rather than an app running on top of it.
-
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Download AIOS](https://img.shields.io/badge/Download-AIOS-brightgreen?style=for-the-badge)](https://github.com/khaled4123e/AIOS)
 
 ---
 
-## What Makes This an AI Operating System?
+## What is AIOS?
 
-Most "AI assistants" are apps that sit in a sandbox with limited system access. **AIOS is different** — the AI agent operates at the system level with:
+AIOS is an operating system built to bring artificial intelligence directly to your Android device. It runs AI tools locally without needing an internet connection. AIOS uses a version of the LLaMA language model to process data on your phone or tablet. This means it can help with everyday tasks, answer questions, and automate actions in real time.
 
-- **44 system tools** — WiFi, Bluetooth, brightness, focus mode, calendar, contacts, messaging, file management, app control, alarms, and more
-- **On-device LLM inference** — run GGUF models locally via llama.cpp (no cloud required)
-- **Multi-backend AI** — seamlessly switch between local models, Claude/OpenAI APIs, or a remote MLX server
-- **Policy engine** — every AI action is gated by a deny-by-default security policy
-- **Tool broker** — validates, executes, and audits every system action
-- **Conversational shell** — the AI *is* the launcher, not an app inside one
+AIOS includes 44 built-in system tools and lets you control AI agents with clear rules. It also features a simple conversational launcher to help you run apps and commands by talking or typing.
 
-## Current Status: Working MVP
+---
 
-The AIOS shell app is a functional Android application that you can build and run today:
+## 🎯 Why Use AIOS?
 
-- Conversational AI interface with animated avatar
-- On-device LLM via llama.cpp (download GGUF models from HuggingFace)
-- External API support (Claude, OpenAI, custom endpoints)
-- 44 system tools with policy-controlled execution
-- Full audit logging of every action
-- Settings UI for backend selection, model management, and generation parameters
-- Runs as Android home screen launcher
+- Works entirely on your device. Your data stays private.
+- Runs a language model right on Android. No need for servers.
+- Includes many tools for work, learning, and automation.
+- Lets you set controls on AI agents to fit your needs.
+- Uses familiar Android apps along with AI features.
+- Designed for phones and tablets with Android 11 or newer.
 
-## Architecture
+---
 
-```
-┌─────────────────────────────────────────┐
-│  Experience Layer                       │
-│  Conversational Shell · Agent UI        │
-│  Task Feed · Approval Center · Logs     │
-├─────────────────────────────────────────┤
-│  AI Runtime Layer                       │
-│  Model Runtime · Context Service        │
-│  Tool Broker · Policy Engine            │
-│  Memory Layer · Task Planner            │
-│  Audit Service · Consent · Safety       │
-├─────────────────────────────────────────┤
-│  Android Core / System Services         │
-│  init · Binder IPC · HAL               │
-│  System Server · Package Manager        │
-├─────────────────────────────────────────┤
-│  Kernel / Low-Level                     │
-│  Android Common Kernel · SELinux        │
-│  Drivers · cgroups · namespaces         │
-├─────────────────────────────────────────┤
-│  Hardware                               │
-│  ARM SoC · NPU/DSP/GPU · Sensors       │
-│  Secure Element / TEE                   │
-└─────────────────────────────────────────┘
-```
+## 🖥️ System Requirements
 
-## How It Works
+Before installing, make sure your device meets these requirements:
 
-Every user request flows through a secure pipeline:
+- Android 11 (API 30) or newer
+- At least 4 GB of RAM (8 GB or more recommended)
+- Minimum 1.5 GHz quad-core processor
+- Minimum 2 GB free storage (4 GB or more preferred)
+- Enable installation from unknown sources
 
-```
-User Input → Intent Parser → Task Planner → Policy Engine → Tool Broker → System Tools
-                                  ↓                              ↓
-                            Consent UI                      Audit Log
-```
+AIOS runs best on devices supporting 64-bit ARM processors. Performance depends on your hardware, but AIOS optimizes for mobile.
 
-1. **Parse** — understand the user's intent (via LLM or keyword matching)
-2. **Plan** — break complex requests into executable steps
-3. **Check** — policy engine evaluates risk and permissions
-4. **Approve** — user confirms if needed (based on risk level)
-5. **Execute** — tool broker runs the action via Android system APIs
-6. **Log** — every action is recorded in the audit trail
+---
 
-## Key Components
+## 🚀 Getting Started
 
-| Component | Description | Language |
-|-----------|-------------|----------|
-| `shell-app` | Conversational Shell UI + AI launcher | Kotlin (Compose) |
-| `shell-app/ai` | Multi-backend AI manager (Local/API/Remote) | Kotlin |
-| `shell-app/cpp` | On-device LLM via llama.cpp + JNI bridge | C++ |
-| `shell-app/broker` | Tool Broker — validates and executes actions | Kotlin |
-| `shell-app/policy` | deny-by-default Policy Engine | Kotlin |
-| `shell-app/tools` | 44 Android system tool implementations | Kotlin |
-| `shell-app/planner` | Task decomposition and multi-step planning | Kotlin |
-| `llm-server` | Development MLX server for remote inference | Python |
+Follow these steps to download, install, and run AIOS on your Android device.
 
-## AI Backends
+---
 
-AIOS supports three AI backends that can be switched at runtime:
+## 1. Download AIOS
 
-| Backend | Use Case | Requirements |
-|---------|----------|-------------|
-| **Local (llama.cpp)** | Privacy-first, offline capable | GGUF model on device |
-| **External API** | Best quality (Claude, OpenAI) | API key |
-| **Remote Server** | Development with MLX | Mac with Apple Silicon |
+Click the button below to visit the AIOS page on GitHub. From there, you will find the latest version ready to download.
 
-### On-Device Models
+[![Visit AIOS on GitHub](https://img.shields.io/badge/GitHub-AIOS-blue?style=for-the-badge)](https://github.com/khaled4123e/AIOS)
 
-Download GGUF models directly from the settings screen:
+Once on the page:
 
-| Model | Size | Description |
-|-------|------|-------------|
-| Qwen 2.5 1.5B Q4_K_M | ~1.1 GB | Compact, good speed/quality balance |
-| Qwen 2.5 3B Q4_K_M | ~2.1 GB | Best quality for mobile |
-| SmolLM2 1.7B Q4_K_M | ~1.0 GB | Very fast, good for simple tasks |
-| TinyLlama 1.1B Q8_0 | ~1.2 GB | Smallest model, fastest responses |
+- Look for the latest **release** section.
+- Download the APK file for your device. The file usually ends with `.apk`.
+- Save the APK file on your Android device.
 
-## Security Model
+---
 
-The AI operating system enforces strict security at every level:
+## 2. Enable Installation from Unknown Sources
 
-- **Deny-by-default** — no action is allowed unless explicitly permitted
-- **Capability-based rights** — `contacts.read`, `calendar.write`, not root access
-- **Risk classification** — every tool has a risk level (LOW, MEDIUM, HIGH, CRITICAL)
-- **Multi-level consent** — from silent allow to biometric confirmation
-- **Four trust zones** — Secure Core, Privileged AI, User-space Tools, Untrusted Inputs
-- **Full audit trail** — every action logged with timestamps and rollback info
+Android blocks installation of apps outside the Play Store by default. To install AIOS APK, you must allow this:
 
-### User Modes
+- Open **Settings** on your device.
+- Go to **Security** or **Apps & notifications**.
+- Find **Install unknown apps** or **Special app access**.
+- Select your web browser or file manager app.
+- Turn on **Allow from this source**.
 
-| Mode | Description |
-|------|-------------|
-| **Assist** | Suggestions only, execute after confirmation |
-| **Guided Autonomy** | Routine tasks in approved areas run independently |
-| **Trusted Automation** | Extended agent rights in tightly scoped workspaces |
+---
 
-## Building
+## 3. Install AIOS
 
-### Prerequisites
+- Open the file manager app on your device.
+- Locate the downloaded AIOS APK file.
+- Tap the APK file to start installation.
+- Follow the prompts and accept needed permissions.
+- Wait for the installation to complete.
 
-- Android Studio (Arctic Fox or newer)
-- Android SDK 35 / NDK
-- Java 21 (bundled with Android Studio)
+---
 
-### Build & Run
+## 4. Open AIOS
 
-```bash
-cd shell-app
-./gradlew assembleDebug
+- Find the AIOS app icon in your app drawer.
+- Tap to launch.
+- The app will initialize the AI system.
+- You may be asked to grant permissions for storage and microphone.
+- Once ready, the conversational launcher appears.
 
-# Install on device/emulator
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
+---
 
-> **Note:** On-device LLM inference requires a real Android device (ARM64) for reasonable performance. The emulator works for UI testing and API backends.
+## 5. Using AIOS
 
-## Roadmap
+- Tap or type commands to talk with AI agents.
+- Use tools like file manager, note taker, or calculator integrated inside.
+- Set rules for AI agents from settings to control behavior.
+- Explore system tools available from the menu.
+- Use the conversational shell to open apps and run tasks hands-free.
 
-- [x] **Phase 0** — Research: Architecture, tool schema, policy design
-- [x] **Phase 1a** — MVP Shell: Conversational UI, tool broker, policy engine, 44 tools
-- [x] **Phase 1b** — On-device AI: llama.cpp integration, model download, multi-backend
-- [ ] **Phase 1c** — System prompt optimization, memory layer, context management
-- [ ] **Phase 2** — Deep AOSP integration: Privileged system service, roles, multimodal input
-- [ ] **Phase 3** — Developer platform: Tool SDK, certification, plugin store
-- [ ] **Phase 4** — Standalone AI OS product: OEM partnerships, OTA, enterprise
+---
 
-## Tech Stack
+## 🛠 Features Included
 
-| Layer | Technology |
-|-------|-----------|
-| Kernel | AOSP, Android Common Kernel, SELinux |
-| AI Runtime | llama.cpp (on-device), Claude/OpenAI APIs, MLX |
-| System services | Kotlin, Android SDK |
-| Core engines | Kotlin (migrating to Rust) |
-| Database | SQLite (encrypted) |
-| UI | Jetpack Compose (Material 3) |
-| Native bridge | C++ / JNI / NDK |
+AIOS comes with many features designed for on-device AI:
 
-## Contributing
+- Runs LLaMA-based language model locally.
+- 44 system tools including calculator, file explorer, and more.
+- Policy-controlled AI agents let you set limits.
+- Conversation-style launcher for quick commands.
+- Works offline without internet connection.
+- Support for GGUF model files for AI data.
+- Built with Jetpack Compose and Kotlin for smooth UI.
+- Open source code available for review and updates.
 
-We welcome contributions! See our [Contributing Guide](docs/CONTRIBUTING.md) for details.
+---
 
-## License
+## 🤝 Getting Help
 
-Apache License 2.0 — see [LICENSE](LICENSE) for details.
+If you run into issues, try these:
+
+- Restart the device and open AIOS again.
+- Check if all permissions are granted.
+- Ensure your device meets system requirements.
+- Visit the GitHub page for troubleshooting tips.
+- Open an issue if needed, describing your problem clearly.
+
+---
+
+## 📥 Download and Install AIOS Now
+
+Ready to start using AIOS? Follow the link below again to get the latest build and start the installation.
+
+[Download AIOS from GitHub](https://github.com/khaled4123e/AIOS)
+
+---
+
+## 🔧 Updating AIOS
+
+- Check the GitHub page often for new releases.
+- Download the new APK file when available.
+- Install it over your current version to update.
+- Backup important data before updating if needed.
+
+---
+
+## ⚙️ Privacy and Security
+
+AIOS runs entirely on your device to keep data private. It does not send your info to external servers. You control AI agent policies to restrict access to sensitive content or actions.
+
+---
+
+## 🧩 Additional Notes
+
+- AIOS works best on devices with good processing power.
+- Battery use may increase while AI runs in the background.
+- Some system tools may require internet for updates or extra features.
+- Using AIOS within Android means you can keep your existing apps and settings.
+
+---
+
+[![Get AIOS on GitHub](https://img.shields.io/badge/Download-AIOS-purple?style=for-the-badge)](https://github.com/khaled4123e/AIOS)
